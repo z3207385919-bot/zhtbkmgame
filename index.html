@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>简易宝可梦对战 V4.1 (UI 布局增强)</title>
+    <title>简易宝可梦对战 V4.2 (图标显示增强)</title>
     <style>
         /* CSS 样式部分 - 修复 Log 区域溢出和图像拉伸 */
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -107,6 +107,7 @@
             position: absolute;
             box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
             font-size: 10px;
+            z-index: 2; /* 确保 HUD 在精灵上方 */
         }
 
         .enemy-hud { top: 20px; left: 20px; }
@@ -135,6 +136,7 @@
             position: absolute;
             image-rendering: pixelated;
             object-fit: contain; /* 关键：确保图片不会被拉伸 */
+            z-index: 1; /* 确保精灵在 HUD 下方 */
         }
 
         .enemy-sprite { top: 60px; right: 60px; }
@@ -196,26 +198,34 @@
             margin-right: 2px;
         }
 
-        /* 队伍状态显示 - 确保可见性 */
+        /* 队伍状态显示 - 核心修复 */
         .team-status {
             position: absolute;
             display: flex;
             gap: 5px;
-            z-index: 5; /* 确保在 HUD 和精灵图片之下，但在背景之上 */
+            z-index: 3; /* 提高 Z-index，确保在 HUD 和精灵之上显示 */
         }
         /* 微调位置以避开 HUD */
         .player-team { bottom: 10px; right: 20px; } 
         .enemy-team { top: 10px; left: 280px; } 
+
         .team-status .poke-icon {
             width: 30px;
             height: 30px;
             border: 2px solid #555;
             border-radius: 50%;
-            background-size: cover;
+            /* 关键：确保背景图的显示设置 */
+            background-size: 100% 100%; /* 确保图片完整填充圆形区域 */
             background-position: center;
-            box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); /* 增加阴影，使其更突出 */
+            background-repeat: no-repeat;
+            box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); /* 增加阴影，使其更突出 */
+            /* 临时背景色，帮助确认元素位置和尺寸是否正常 */
+            /* background-color: rgba(255, 0, 0, 0.2); */ 
         }
-        .fainted { opacity: 0.4; }
+        .fainted { 
+            opacity: 0.4;
+            filter: grayscale(100%); /* 倒下时灰度化 */
+        }
         .active-poke { border-color: #f00 !important; }
 
         /* 替换/道具选择界面 */
@@ -319,7 +329,7 @@
 
 <script>
 /**
- * 游戏数据与逻辑核心 V4.1 (UI 布局增强)
+ * 游戏数据与逻辑核心 V4.2 (图标显示增强)
  */
 
 // 1. 属性克制表 (不变)
@@ -332,7 +342,7 @@ const TYPE_COLORS = {
     normal: '#A8A77A', fire: '#EE8130', water: '#6390F0', electric: '#F7D02C', grass: '#7AC74C', ice: '#96D9D6', fighting: '#C22E28', poison: '#A33EA1', ground: '#E2BF65', flying: '#A98FF3', psychic: '#F95587', bug: '#A6B91A', rock: '#B6A136', ghost: '#735797', dragon: '#6F35FC', steel: '#B7B7CE', dark: '#705746', fairy: '#D685AD'
 };
 
-// 2. 宝可梦数据库 (所有 Move 增加 maxPp)
+// 2. 宝可梦数据库 (使用 PokeAPI 官方图片链接)
 const POKEMON_DB = [
     { id: 1, name: "妙蛙花", types: ["grass", "poison"], hp: 360, stats: { atk: 182, def: 183 }, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/3.png", moves: [{ name: "藤鞭", type: "grass", power: 45, maxPp: 20 }, { name: "污泥炸弹", type: "poison", power: 90, maxPp: 10 }, { name: "地震", type: "ground", power: 100, maxPp: 10 }, { name: "撞击", type: "normal", power: 40, maxPp: 30 }] },
     { id: 2, name: "喷火龙", types: ["fire", "flying"], hp: 356, stats: { atk: 204, def: 158 }, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png", moves: [{ name: "喷射火焰", type: "fire", power: 90, maxPp: 15 }, { name: "空气斩", type: "flying", power: 75, maxPp: 15 }, { name: "龙爪", type: "dragon", power: 80, maxPp: 15 }, { name: "大字爆炎", type: "fire", power: 110, maxPp: 5 }] },
@@ -489,7 +499,7 @@ function initializeMoves(moves) {
 }
 
 // ----------------------------------------------------
-// 队伍状态渲染 
+// 队伍状态渲染 - 核心代码
 // ----------------------------------------------------
 function renderTeamStatus() {
     const renderIcons = (team, containerId, activeIndex) => {
@@ -499,14 +509,20 @@ function renderTeamStatus() {
         team.forEach((item, index) => {
             const icon = document.createElement('div');
             icon.className = 'poke-icon';
+            
             // 确保背景图路径正确且能加载
+            // 使用 CSS background-image 加载宝可梦头像
             icon.style.backgroundImage = `url(${item.poke.img})`;
 
             if (item.isFainted) {
                 icon.classList.add('fainted');
+            } else {
+                 icon.classList.remove('fainted');
             }
             if (index === activeIndex) {
                 icon.classList.add('active-poke');
+            } else {
+                icon.classList.remove('active-poke');
             }
             container.appendChild(icon);
         });
